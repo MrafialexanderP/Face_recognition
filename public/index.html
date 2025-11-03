@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Face Recognition Web</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <h1>Face Recognition</h1>
+    <nav>
+      <a href="/register">Daftarkan Wajah</a>
+    </nav>
+  </header>
+
+  <main class="container">
+    <div class="video-wrapper">
+      <video id="video" autoplay playsinline muted></video>
+      <canvas id="overlay"></canvas>
+    </div>
+
+    <div class="controls">
+      <button id="startBtn">Mulai Kamera</button>
+      <button id="stopBtn" disabled>Berhenti</button>
+      <label style="margin-left:12px; display:flex; align-items:center; gap:6px;">
+        <input type="checkbox" id="hiAcc" /> Akurasi Tinggi (CNN)
+      </label>
+    </div>
+
+    <div id="status" class="status">Siap.</div>
+  </main>
+
+  <script src="/script.js"></script>
+</body>
+</html>

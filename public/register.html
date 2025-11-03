@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Daftar Wajah</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <h1>Daftarkan Wajah</h1>
+    <nav>
+      <a href="/">Beranda</a>
+    </nav>
+  </header>
+
+  <main class="container">
+    <label>Nama:</label>
+    <input type="text" id="nameInput" placeholder="Masukkan nama" />
+
+    <div class="video-wrapper">
+      <video id="regVideo" autoplay playsinline muted></video>
+      <canvas id="snapshot" class="hidden"></canvas>
+    </div>
+
+    <div class="controls">
+      <button id="startRegBtn">Mulai Kamera</button>
+      <button id="registerBtn" disabled>Ambil & Daftar</button>
+      <label style="margin-left:12px; display:flex; align-items:center; gap:6px;">
+        <input type="checkbox" id="hiAccReg" /> Akurasi Tinggi (CNN)
+      </label>
+    </div>
+
+    <div id="regStatus" class="status">Siap.</div>
+  </main>
+
+  <script src="/register.js"></script>
+</body>
+</html>
