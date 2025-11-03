@@ -3,20 +3,20 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Daftar Wajah</title>
+  <title>Pendaftaran Wajah - Face Recognition</title>
   <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
   <header class="topbar">
-    <h1>Daftarkan Wajah</h1>
+    <h1>📝 Pendaftaran Wajah</h1>
     <nav>
-      <a href="/">Beranda</a>
+      <a href="/">🏠 Beranda</a>
     </nav>
   </header>
 
   <main class="container">
-    <label>Nama:</label>
-    <input type="text" id="nameInput" placeholder="Masukkan nama" />
+    <label>👤 Nama Lengkap:</label>
+    <input type="text" id="nameInput" placeholder="Masukkan nama Anda" />
 
     <div class="video-wrapper">
       <video id="regVideo" autoplay playsinline muted></video>
@@ -24,14 +24,15 @@
     </div>
 
     <div class="controls">
-      <button id="startRegBtn">Mulai Kamera</button>
-      <button id="registerBtn" disabled>Ambil & Daftar</button>
-      <label style="margin-left:12px; display:flex; align-items:center; gap:6px;">
-        <input type="checkbox" id="hiAccReg" /> Akurasi Tinggi (CNN)
+      <button id="startRegBtn">▶️ Mulai Kamera</button>
+      <button id="registerBtn" disabled>📸 Ambil & Daftar</button>
+      <label style="display:flex; align-items:center; gap:8px;">
+        <input type="checkbox" id="hiAccReg" /> 
+        <span>🎯 Akurasi Tinggi (CNN)</span>
       </label>
     </div>
 
-    <div id="regStatus" class="status">Siap.</div>
+    <div id="regStatus" class="status">✨ Siap untuk mendaftarkan wajah baru</div>
   </main>
 
   <script src="/register.js"></script>
