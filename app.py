@@ -99,13 +99,20 @@ def api_register():
         return jsonify({"ok": False, "error": str(e)}), 400
 
     try:
+        model = (payload.get("model") or "auto").lower()
         # Coba deteksi cepat (HOG) terlebih dahulu; jika gagal, fallback ke CNN (lebih akurat untuk berbagai arah wajah)
-        boxes = face_recognition.face_locations(rgb, model="hog")
-        if not boxes:
-            boxes = face_recognition.face_locations(rgb, model="cnn")
+        if model == "cnn":
+            boxes = face_recognition.face_locations(rgb, model="cnn", number_of_times_to_upsample=1)
+        elif model == "hog":
+            boxes = face_recognition.face_locations(rgb, model="hog")
+        else:  # auto
+            boxes = face_recognition.face_locations(rgb, model="hog")
+            if not boxes:
+                boxes = face_recognition.face_locations(rgb, model="cnn", number_of_times_to_upsample=1)
+        
         if len(boxes) != 1:
             return jsonify({"ok": False, "error": f"Ditemukan {len(boxes)} wajah. Harap pastikan hanya satu wajah saat pendaftaran."}), 400
-        enc = face_recognition.face_encodings(rgb, boxes)
+        enc = face_recognition.face_encodings(rgb, boxes, num_jitters=2)  # num_jitters=2 untuk akurasi pendaftaran
         if not enc:
             return jsonify({"ok": False, "error": "Tidak dapat mengekstrak fitur wajah."}), 400
         encoding = enc[0].tolist()
@@ -118,12 +125,13 @@ def api_register():
         return jsonify({"ok": False, "error": f"Gagal mendaftar: {e}"}), 500
 
 
-@app.route("/api/recognize", methods=["POST"]) 
-def api_recognize():
+@app.route("/api/detect", methods=["POST"]) 
+def api_detect():
     if face_recognition is None:
         return jsonify({"ok": False, "error": "Dependencies not installed. Install from requirements.txt (note: dlib/face_recognition on Windows requires Build Tools)."}), 500
     payload = request.get_json(silent=True) or {}
     image_b64 = payload.get("image")
+    model_pref = (payload.get("model") or "auto").lower()
     if not image_b64:
         return jsonify({"ok": False, "error": "Gambar tidak ditemukan."}), 400
 
@@ -133,40 +141,27 @@ def api_recognize():
         return jsonify({"ok": False, "error": str(e)}), 400
 
     try:
-        # Coba HOG dahulu (lebih cepat), lalu fallback ke CNN agar lebih robust untuk pose/arah wajah.
-        boxes = face_recognition.face_locations(rgb, model="hog")
-        if not boxes:
-            boxes = face_recognition.face_locations(rgb, model="cnn")
-        encs = face_recognition.face_encodings(rgb, boxes)
-
-        data = load_users()
-        known = data.get("users", [])
-        known_encs = [np.array(u["encoding"], dtype=np.float32) for u in known]
-        known_names = [u["name"] for u in known]
-
+        # Gunakan preferensi model dari client
+        if model_pref == "cnn":
+            boxes = face_recognition.face_locations(rgb, model="cnn", number_of_times_to_upsample=1)
+        elif model_pref == "hog":
+            boxes = face_recognition.face_locations(rgb, model="hog")
+        else:  # auto
+            # HOG lebih cepat untuk tracking real-time
+            boxes = face_recognition.face_locations(rgb, model="hog")
+            if not boxes:
+                boxes = face_recognition.face_locations(rgb, model="cnn", number_of_times_to_upsample=1)
+        
+        # Hanya return koordinat box tanpa recognition
         results = []
-        for box, enc in zip(boxes, encs):
-            name = "Unknown"
-            distance = None
-            if known_encs:
-                dists = face_recognition.face_distance(known_encs, enc)
-                best_idx = int(np.argmin(dists))
-                best_dist = float(dists[best_idx])
-                # Typical threshold ~0.6 (lower = stricter)
-                if best_dist <= 0.6:
-                    name = known_names[best_idx]
-                    distance = best_dist
-                else:
-                    distance = best_dist
+        for box in boxes:
             top, right, bottom, left = box
             results.append({
-                "box": {"top": int(top), "right": int(right), "bottom": int(bottom), "left": int(left)},
-                "name": name,
-                "distance": distance
+                "box": {"top": int(top), "right": int(right), "bottom": int(bottom), "left": int(left)}
             })
         return jsonify({"ok": True, "faces": results})
     except Exception as e:
-        return jsonify({"ok": False, "error": f"Gagal mengenali: {e}"}), 500
+        return jsonify({"ok": False, "error": f"Gagal mendeteksi: {e}"}), 500
 
 
 if __name__ == "__main__":
