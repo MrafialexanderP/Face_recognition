@@ -4,7 +4,9 @@
   const statusEl = document.getElementById('status');
   const startBtn = document.getElementById('startBtn');
   const stopBtn = document.getElementById('stopBtn');
-  const hiAcc = document.getElementById('hiAcc');
+  const confSlider = document.getElementById('confSlider');
+  const confLabel = document.getElementById('confLabel');
+  const attendanceLog = document.getElementById('attendanceLog');
 
   let stream = null;
   let timer = null;
@@ -14,6 +16,7 @@
   let captureCanvas = document.createElement('canvas');
   let captureCtx = captureCanvas.getContext('2d');
   let overlayCtx = overlay.getContext('2d');
+  let recentAttendance = new Set(); // Track recently logged attendance to avoid duplicates
 
   function setStatus(msg){ statusEl.textContent = msg; }
 
@@ -28,6 +31,8 @@
       lastFaces = [];
       lastFacesAt = 0;
       smoothedBoxes = {};
+      faceIds = {};
+      recentAttendance.clear();
       overlayCtx.clearRect(0,0,overlay.width, overlay.height);
       
       stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
@@ -43,7 +48,7 @@
       startRecognitionLoop();
     } catch(err){
       console.error(err);
-      setStatus('❌ Gagal mengakses kamera: ' + err.message);
+      setStatus('✗ Camera access denied');
       startBtn.disabled = false;
       stopBtn.disabled = true;
     }
@@ -65,7 +70,9 @@
     lastFaces = [];
     lastFacesAt = 0;
     smoothedBoxes = {};
-    setStatus('🛑 Kamera berhenti.');
+    faceIds = {};
+    recentAttendance.clear();
+    setStatus('⏸ Stopped');
   }
 
   function resizeCanvases(){
@@ -78,9 +85,41 @@
   let lastFaces = [];
   let lastFacesAt = 0;
   let smoothedBoxes = {}; // untuk smooth tracking per wajah
+  let faceIds = {}; // Track face IDs for better matching across frames
 
-  function smoothBox(newBox, oldBox, alpha = 0.3) {
-    // Linear interpolation untuk smooth movement
+  function calculateIOU(box1, box2) {
+    // Calculate Intersection over Union for box matching
+    const xA = Math.max(box1.left, box2.left);
+    const yA = Math.max(box1.top, box2.top);
+    const xB = Math.min(box1.right, box2.right);
+    const yB = Math.min(box1.bottom, box2.bottom);
+    
+    const interArea = Math.max(0, xB - xA) * Math.max(0, yB - yA);
+    const box1Area = (box1.right - box1.left) * (box1.bottom - box1.top);
+    const box2Area = (box2.right - box2.left) * (box2.bottom - box2.top);
+    
+    const unionArea = box1Area + box2Area - interArea;
+    return unionArea > 0 ? interArea / unionArea : 0;
+  }
+
+  function matchFaceToId(newBox, prevFaces) {
+    // Match current face box to previous frame using IOU
+    let bestMatch = null;
+    let bestIOU = 0.3; // Minimum IOU threshold
+    
+    for (let prevFace of prevFaces) {
+      const iou = calculateIOU(newBox, prevFace.box);
+      if (iou > bestIOU) {
+        bestIOU = iou;
+        bestMatch = prevFace.id;
+      }
+    }
+    
+    return bestMatch;
+  }
+
+  function smoothBox(newBox, oldBox, alpha = 0.5) {
+    // Linear interpolation untuk smooth movement dengan alpha lebih tinggi
     if (!oldBox) return newBox;
     return {
       top: Math.round(oldBox.top + (newBox.top - oldBox.top) * alpha),
@@ -96,19 +135,32 @@
     overlayCtx.font = 'bold 18px system-ui';
     
     const newSmoothedBoxes = {};
+    const currentFaces = [];
     
     for (let i = 0; i < faces.length; i++){
       const f = faces[i];
-      // ID berdasarkan index dan posisi untuk tracking
-      const faceId = 'face_' + i + '_' + Math.round(f.box.left / 50);
-      const smoothed = smoothBox(f.box, smoothedBoxes[faceId], 0.4);
+      
+      // Match face to previous frame using IOU
+      const prevFaceData = lastFaces.length > 0 ? lastFaces : [];
+      let faceId = matchFaceToId(f.box, prevFaceData);
+      
+      // If no match found, create new ID
+      if (!faceId) {
+        faceId = 'face_' + Date.now() + '_' + i;
+      }
+      
+      // Apply smoothing using tracked ID
+      const smoothed = smoothBox(f.box, smoothedBoxes[faceId], 0.6);
       newSmoothedBoxes[faceId] = smoothed;
       
       const b = smoothed;
+      const isLive = f.liveness && f.liveness.live;
+      const strokeColor = isLive ? '#00FF00' : '#FF2D2D';
+      const shadowColor = isLive ? 'rgba(0,255,0,0.6)' : 'rgba(255,50,50,0.6)';
       
-      // Kotak hijau dengan glow effect
-      overlayCtx.strokeStyle = '#00FF00';
-      overlayCtx.shadowColor = 'rgba(0,255,0,0.6)';
+      // Kotak dengan glow effect (hijau jika live, merah jika spoof)
+      overlayCtx.strokeStyle = strokeColor;
+      overlayCtx.shadowColor = shadowColor;
       overlayCtx.shadowBlur = 15;
       
       // Draw rounded rectangle
@@ -129,14 +181,31 @@
       overlayCtx.shadowBlur = 0;
       
       // Label "Face Detected"
-      const label = `Face #${i + 1}`;
+      const name = f.name || null;
+      let label = '';
+      
+      if (name && isLive) {
+        label = `${name}`;
+        // Auto log attendance for recognized live faces
+        logAttendance(name);
+      } else if (isLive) {
+        label = `Unknown #${i + 1}`;
+      } else {
+        label = `SPOOF? #${i + 1}`;
+      }
+      
       const labelWidth = overlayCtx.measureText(label).width + 20;
       const labelHeight = 30;
       
       // Label background dengan gradient
       const gradient = overlayCtx.createLinearGradient(b.left, b.top - labelHeight, b.left, b.top);
-      gradient.addColorStop(0, 'rgba(0,255,0,0.95)');
-      gradient.addColorStop(1, 'rgba(0,200,0,0.95)');
+      if (isLive) {
+        gradient.addColorStop(0, 'rgba(0,255,0,0.95)');
+        gradient.addColorStop(1, 'rgba(0,200,0,0.95)');
+      } else {
+        gradient.addColorStop(0, 'rgba(255,70,70,0.95)');
+        gradient.addColorStop(1, 'rgba(200,40,40,0.95)');
+      }
       overlayCtx.fillStyle = gradient;
       
       overlayCtx.beginPath();
@@ -153,16 +222,76 @@
       overlayCtx.shadowBlur = 3;
       overlayCtx.fillText(label, b.left + 10, b.top - 8);
       overlayCtx.shadowBlur = 0;
+      
+      // Store for next frame matching
+      currentFaces.push({
+        id: faceId,
+        box: smoothed,
+        name: name
+      });
     }
     
     smoothedBoxes = newSmoothedBoxes;
+    lastFaces = currentFaces;
     
-    if (faces.length === 1){ 
-      setStatus('✅ Terdeteksi 1 wajah'); 
-    } else if (faces.length > 1) { 
-      setStatus(`✅ Terdeteksi ${faces.length} wajah`); 
+    // Count recognized vs unknown
+    const recognized = faces.filter(f => f.name && f.liveness && f.liveness.live).length;
+    const unknown = faces.filter(f => !f.name && f.liveness && f.liveness.live).length;
+    const spoof = faces.filter(f => f.liveness && !f.liveness.live).length;
+    
+    if (recognized > 0){
+      setStatus(`✅ ${recognized} wajah dikenali`);
+    } else if (unknown > 0) { 
+      setStatus(`👤 ${unknown} wajah tidak dikenal`); 
+    } else if (spoof > 0) {
+      setStatus(`⚠️ ${spoof} wajah palsu terdeteksi`);
     } else { 
       setStatus('🔍 Mencari wajah...'); 
+    }
+  }
+
+  async function logAttendance(name) {
+    // Avoid duplicate logs within 60 seconds
+    if (recentAttendance.has(name)) return;
+    
+    try {
+      const resp = await fetch('/api/attendance', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: name })
+      });
+      const data = await resp.json();
+      if (data.ok) {
+        recentAttendance.add(name);
+        // Clear from set after 60 seconds
+        setTimeout(() => recentAttendance.delete(name), 60000);
+        // Update attendance log if element exists
+        if (attendanceLog) {
+          updateAttendanceLog();
+        }
+      }
+    } catch(err) {
+      console.error('Attendance log error:', err);
+    }
+  }
+
+  async function updateAttendanceLog() {
+    if (!attendanceLog) return;
+    try {
+      const resp = await fetch('/api/attendance');
+      const data = await resp.json();
+      if (data.ok && data.records) {
+        // Show last 5 records
+        const recent = data.records.slice(-5).reverse();
+        attendanceLog.innerHTML = recent.map(r => 
+          `<div class="log-entry">
+            <span class="log-name">${r.name}</span>
+            <span class="log-time">${r.time}</span>
+          </div>`
+        ).join('');
+      }
+    } catch(err) {
+      console.error('Failed to fetch attendance:', err);
     }
   }
 
@@ -176,7 +305,11 @@
     }
     
     // Kurangi ukuran gambar untuk processing lebih cepat
-    const scale = 0.5; // proses di 50% ukuran untuk kecepatan
+    // Adaptive scale: start at 0.6, increase to 1.0 if many misses
+    if (typeof window.__adaptiveMisses === 'undefined') window.__adaptiveMisses = 0;
+    let baseScale = 0.6;
+    if (window.__adaptiveMisses >= 15) baseScale = 1.0; else if (window.__adaptiveMisses >= 8) baseScale = 0.8;
+    const scale = baseScale;
     const w = Math.floor(captureCanvas.width * scale);
     const h = Math.floor(captureCanvas.height * scale);
     
@@ -205,10 +338,14 @@
       const controller = new AbortController();
       currentController = controller;
       const mySession = sessionId;
+      let confidence = confSlider ? parseFloat(confSlider.value) / 100 : 0.3;
+      // Lower confidence threshold adaptively after many misses
+      if (window.__adaptiveMisses >= 15 && confidence > 0.15) confidence = 0.15;
+      else if (window.__adaptiveMisses >= 8 && confidence > 0.22) confidence = 0.22;
       const resp = await fetch('/api/detect', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ image: base64, model: hiAcc && hiAcc.checked ? 'cnn' : 'auto' }),
+        body: JSON.stringify({ image: base64, confidence: confidence, sessionId: mySession }),
         signal: controller.signal
       });
       const data = await resp.json();
@@ -225,10 +362,13 @@
           right: Math.round(f.box.right / scale),
           bottom: Math.round(f.box.bottom / scale),
           left: Math.round(f.box.left / scale)
-        }
+        },
+        liveness: f.liveness || { live: true },
+        name: f.name || null
       }));
       
       if (scaledFaces.length){
+        window.__adaptiveMisses = 0; // reset on success
         lastFaces = scaledFaces;
         lastFacesAt = Date.now();
         drawResults(scaledFaces);
@@ -239,11 +379,12 @@
         } else {
           drawResults([]);
         }
+        window.__adaptiveMisses++;
       }
     } catch(err){
       if (err.name === 'AbortError') return; // diabaikan saat berhenti
       console.error(err);
-      if (running) setStatus('❌ Gagal mendeteksi: ' + err.message);
+      if (running) setStatus('✗ Detection failed');
     }
   }
 
@@ -252,8 +393,8 @@
     // Delay awal untuk memastikan video ready
     setTimeout(() => {
       if (running && stream) {
-        // Interval lebih cepat untuk tracking yang smooth (150ms = ~6-7 FPS)
-        timer = setInterval(recognizeOnce, 150);
+        // Interval 100ms untuk real-time detection (~10 FPS)
+        timer = setInterval(recognizeOnce, 100);
         // Trigger pertama kali langsung
         recognizeOnce();
       }
@@ -263,4 +404,17 @@
   window.addEventListener('resize', resizeCanvases);
   startBtn.addEventListener('click', startCamera);
   stopBtn.addEventListener('click', stopCamera);
+  
+  if (confSlider) {
+    confSlider.addEventListener('input', (e) => {
+      confLabel.textContent = `Confidence: ${e.target.value}%`;
+    });
+  }
+
+  // Load attendance log on page load
+  if (attendanceLog) {
+    updateAttendanceLog();
+    // Refresh every 10 seconds
+    setInterval(updateAttendanceLog, 10000);
+  }
 })();

@@ -1,51 +1,93 @@
-# Face Recognition Web (Python + Flask)
+# Face Attendance System 🎯
 
-A simple web app that shows your camera in the browser and recognizes registered faces using a Python backend.
+Sistem absensi berbasis pengenalan wajah dengan anti-spoofing dan deteksi real-time menggunakan YOLO + face_recognition.
 
-## Features
+## Fitur Utama
 
-- Live camera preview in browser
-- Register a face with a name
-- Recognize known faces in real time
-- Stores face encodings in `data/users.json`
+✅ **Deteksi Wajah Real-time** - YOLO untuk deteksi multi-wajah cepat dan akurat  
+✅ **Pengenalan Wajah** - Face recognition untuk identifikasi nama yang terdaftar  
+✅ **Anti-Spoofing** - Liveness detection untuk mencegah foto palsu  
+✅ **Absensi Otomatis** - Pencatatan kehadiran otomatis saat wajah dikenali  
+✅ **Log Attendance** - Riwayat kehadiran dengan timestamp  
+✅ **Multi-Angle Detection** - Deteksi wajah dari berbagai sudut  
+
+## Status Deteksi
+
+| Warna Box | Status | Keterangan |
+|-----------|--------|------------|
+| 🟢 Hijau + Nama | LIVE + Dikenali | Wajah asli & terdaftar (absensi otomatis tercatat) |
+| 🟢 Hijau + Unknown | LIVE + Tidak dikenali | Wajah asli tapi belum terdaftar |
+| 🔴 Merah + SPOOF | SPOOF | Foto/video palsu terdeteksi |
 
 ## Prerequisites (Windows)
 
-Face recognition uses the `face_recognition` library which depends on `dlib`. On Windows, ensure you have:
+- Python 3.10+ (64-bit)
+- Microsoft C++ Build Tools (untuk dlib)
+- Koneksi internet (download YOLO model pertama kali)
 
-- Python 3.10+ (64-bit recommended)
-- Microsoft C++ Build Tools (via Visual Studio Build Tools) or prebuilt wheels available for your Python version
-
-If `pip install face-recognition` fails on dlib, install Build Tools then try again, or consider using a virtual environment matching common wheel availability.
-
-## Setup and Run (PowerShell)
+## Setup and Run
 
 ```powershell
-# 1) Create and activate virtual environment
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-
-# 2) Upgrade pip
-python -m pip install --upgrade pip
-
-# 3) Install dependencies
+# 1) Install dependencies
 pip install -r requirements.txt
 
-# 4) Run the server
-$env:FLASK_DEBUG="1"; python app.py
-# App runs at http://localhost:5000
+# 2) Run server
+py app.py
+
+# 3) Open browser
+# http://localhost:5000
 ```
 
-Open http://localhost:5000 to see the camera view. Use the "Daftarkan Wajah" link to enroll your face (enter a name, ensure only one face is visible, then click "Ambil & Daftar").
+## Cara Menggunakan
 
-## API
+### 1. Daftar Wajah Baru
 
-- POST `/api/register` JSON `{ name: string, image: base64jpeg }`
-- POST `/api/recognize` JSON `{ image: base64jpeg }` -> `{ ok, faces: [{ box, name, distance }] }`
-- GET `/api/users` -> list of registered names and counts
+1. Buka `http://localhost:5000/register`
+2. Masukkan nama lengkap
+3. Klik **START CAMERA**
+4. Posisikan wajah (pastikan hanya 1 wajah terlihat)
+5. Klik **CAPTURE & REGISTER**
 
-## Notes
+### 2. Mulai Deteksi & Absensi
 
-- Threshold for a match is 0.6 (stricter is lower). Adjust in `app.py` if needed.
-- All processing happens on the server with Python; frames are sent from the browser as JPEG base64.
+1. Buka `http://localhost:5000`
+2. Klik **START**
+3. Sistem akan mendeteksi, mengenali, dan mencatat absensi otomatis
+4. Log kehadiran muncul di panel bawah
+
+## API Endpoints
+
+### Registrasi
+```
+POST /api/register
+Body: { "name": "John Doe", "image": "base64_string" }
+```
+
+### Deteksi & Pengenalan
+```
+POST /api/detect
+Body: { "image": "base64_string", "confidence": 0.3, "sessionId": 123 }
+Response: { "ok": true, "faces": [{ "box": {...}, "name": "...", "liveness": {...} }] }
+```
+
+### Absensi
+```
+POST /api/attendance - Catat manual
+GET /api/attendance?date=YYYY-MM-DD - Lihat riwayat
+```
+
+## Troubleshooting
+
+**Wajah tidak terdeteksi**: Turunkan confidence slider ke 20-30%  
+**Selalu SPOOF**: Gerakkan kepala sedikit untuk liveness motion  
+**Tidak dikenali**: Daftar ulang dengan foto lebih jelas  
+**Install gagal**: Install Visual Studio Build Tools dulu
+
+## Technologies
+
+- Flask + Python
+- YOLOv8 (face detection)
+- face_recognition/dlib (encoding)
+- Liveness: Laplacian variance + motion analysis
+- Frontend: Vanilla JS + Canvas
 - You can back up `data/users.json` to preserve enrollments.

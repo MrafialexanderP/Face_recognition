@@ -4,7 +4,6 @@
   const startBtn = document.getElementById('startRegBtn');
   const registerBtn = document.getElementById('registerBtn');
   const statusEl = document.getElementById('regStatus');
-  const hiAccReg = document.getElementById('hiAccReg');
   const snapshot = document.getElementById('snapshot');
   const snapCtx = snapshot.getContext('2d');
 
@@ -21,32 +20,45 @@
       snapshot.height = video.videoHeight || 480;
       startBtn.disabled = true;
       registerBtn.disabled = false;
-      setStatus('Kamera aktif. Pastikan hanya satu wajah terlihat.');
+      setStatus('✅ Camera active. Make sure only one face is visible.');
     } catch(err){
       console.error(err);
-      setStatus('Gagal mengakses kamera: ' + err.message);
+      setStatus('✗ Camera access failed: ' + err.message);
     }
   }
 
   async function registerOnce(){
     const name = (nameInput.value || '').trim();
-    if (!name){ setStatus('Nama wajib diisi.'); return; }
-    if (!stream){ setStatus('Kamera belum aktif.'); return; }
+    if (!name){ setStatus('⚠️ Name is required.'); return; }
+    if (!stream){ setStatus('⚠️ Camera not active.'); return; }
+    
+    setStatus('📸 Capturing...');
+    registerBtn.disabled = true;
+    
     snapCtx.drawImage(video, 0, 0, snapshot.width, snapshot.height);
     const dataUrl = snapshot.toDataURL('image/jpeg', 0.9);
     const base64 = dataUrl.split(',')[1];
+    
     try {
       const resp = await fetch('/api/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, image: base64, model: hiAccReg && hiAccReg.checked ? 'cnn' : 'auto' })
+        body: JSON.stringify({ name, image: base64 })
       });
       const data = await resp.json();
-      if (!data.ok) throw new Error(data.error || 'Gagal mendaftar');
-      setStatus('Berhasil mendaftarkan: ' + name);
+      if (!data.ok) throw new Error(data.error || 'Registration failed');
+      
+      setStatus('✅ Success! ' + name + ' has been registered.');
+      nameInput.value = '';
+      
+      // Redirect after 2 seconds
+      setTimeout(() => {
+        window.location.href = '/';
+      }, 2000);
     } catch(err){
       console.error(err);
-      setStatus('Gagal mendaftar: ' + err.message);
+      setStatus('✗ Registration failed: ' + err.message);
+      registerBtn.disabled = false;
     }
   }
 

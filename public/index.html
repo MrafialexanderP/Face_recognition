@@ -3,12 +3,15 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Face Detection - Tracking Wajah Real-Time</title>
+  <title>Face Detection</title>
   <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
   <header class="topbar">
-    <h1>🎯 Face Detection & Tracking</h1>
+    <h1>FACE ATTENDANCE SYSTEM</h1>
+    <nav>
+      <a href="/register" class="nav-link">Register Face</a>
+    </nav>
   </header>
 
   <main class="container">
@@ -18,15 +21,22 @@
     </div>
 
     <div class="controls">
-      <button id="startBtn">▶️ Mulai Kamera</button>
-      <button id="stopBtn" disabled>⏹️ Berhenti</button>
-      <label style="display:flex; align-items:center; gap:8px;">
-        <input type="checkbox" id="hiAcc" /> 
-        <span>🎯 Akurasi Tinggi (CNN)</span>
+      <button id="startBtn">START</button>
+      <button id="stopBtn" disabled>STOP</button>
+      <label>
+        <input type="range" id="confSlider" min="10" max="80" value="30" /> 
+        <span id="confLabel">Confidence: 30%</span>
       </label>
     </div>
 
-    <div id="status" class="status">✨ Siap untuk mendeteksi wajah</div>
+    <div id="status" class="status">Ready to detect faces</div>
+
+    <div class="attendance-panel">
+      <h2>Recent Attendance</h2>
+      <div id="attendanceLog" class="attendance-log">
+        <div class="log-entry">Waiting for data...</div>
+      </div>
+    </div>
   </main>
 
   <script src="/script.js"></script>

@@ -8,15 +8,17 @@
 </head>
 <body>
   <header class="topbar">
-    <h1>📝 Pendaftaran Wajah</h1>
+    <h1>REGISTER NEW FACE</h1>
     <nav>
-      <a href="/">🏠 Beranda</a>
+      <a href="/" class="nav-link">Back to Home</a>
     </nav>
   </header>
 
   <main class="container">
-    <label>👤 Nama Lengkap:</label>
-    <input type="text" id="nameInput" placeholder="Masukkan nama Anda" />
+    <div class="form-group">
+      <label for="nameInput">Full Name:</label>
+      <input type="text" id="nameInput" placeholder="Enter your name" />
+    </div>
 
     <div class="video-wrapper">
       <video id="regVideo" autoplay playsinline muted></video>
@@ -24,15 +26,11 @@
     </div>
 
     <div class="controls">
-      <button id="startRegBtn">▶️ Mulai Kamera</button>
-      <button id="registerBtn" disabled>📸 Ambil & Daftar</button>
-      <label style="display:flex; align-items:center; gap:8px;">
-        <input type="checkbox" id="hiAccReg" /> 
-        <span>🎯 Akurasi Tinggi (CNN)</span>
-      </label>
+      <button id="startRegBtn">START CAMERA</button>
+      <button id="registerBtn" disabled>CAPTURE & REGISTER</button>
     </div>
 
-    <div id="regStatus" class="status">✨ Siap untuk mendaftarkan wajah baru</div>
+    <div id="regStatus" class="status">Ready to register new face</div>
   </main>
 
   <script src="/register.js"></script>
