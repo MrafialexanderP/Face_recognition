@@ -1,0 +1,396 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Hasil Pengenalan - Sistem Absensi Wajah</title>
+  <link rel="stylesheet" href="/styles.css">
+  <style>
+    .result-container {
+      max-width: 700px;
+      margin: 0 auto;
+      padding: 40px 20px;
+    }
+    
+    .result-card {
+      background: rgba(255, 255, 255, 0.98);
+      border-radius: 25px;
+      padding: 50px 40px;
+      box-shadow: 0 25px 70px rgba(0, 0, 0, 0.35);
+      text-align: center;
+      animation: slideUp 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+      border: 3px solid rgba(102, 126, 234, 0.2);
+    }
+    
+    @keyframes slideUp {
+      from { 
+        opacity: 0; 
+        transform: translateY(40px) scale(0.95); 
+      }
+      to { 
+        opacity: 1; 
+        transform: translateY(0) scale(1); 
+      }
+    }
+    
+    .success-icon {
+      font-size: 80px;
+      margin-bottom: 20px;
+      animation: bounce 1s ease-out;
+      display: inline-block;
+    }
+    
+    @keyframes bounce {
+      0%, 20%, 50%, 80%, 100% { transform: translateY(0); }
+      40% { transform: translateY(-25px); }
+      60% { transform: translateY(-12px); }
+    }
+    
+    .result-title {
+      font-size: 28px;
+      font-weight: 700;
+      color: #667eea;
+      margin-bottom: 30px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    
+    .result-photo-wrapper {
+      position: relative;
+      display: inline-block;
+      margin-bottom: 35px;
+    }
+    
+    .result-photo {
+      width: 220px;
+      height: 220px;
+      border-radius: 50%;
+      object-fit: cover;
+      border: 6px solid #667eea;
+      box-shadow: 0 15px 40px rgba(102, 126, 234, 0.4);
+      transition: all 0.3s ease;
+    }
+    
+    .result-photo:hover {
+      transform: scale(1.05);
+      box-shadow: 0 20px 50px rgba(102, 126, 234, 0.5);
+    }
+    
+    .photo-badge {
+      position: absolute;
+      bottom: 15px;
+      right: 15px;
+      background: linear-gradient(135deg, #00d084 0%, #00b375 100%);
+      color: white;
+      width: 50px;
+      height: 50px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      box-shadow: 0 5px 15px rgba(0, 208, 132, 0.4);
+      border: 3px solid white;
+    }
+    
+    .result-info {
+      margin: 30px 0;
+      background: linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%);
+      border-radius: 20px;
+      padding: 30px;
+    }
+    
+    .info-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 18px 0;
+      border-bottom: 2px solid rgba(102, 126, 234, 0.1);
+      transition: all 0.3s ease;
+    }
+    
+    .info-row:hover {
+      background: rgba(102, 126, 234, 0.05);
+      padding-left: 10px;
+      padding-right: 10px;
+      border-radius: 10px;
+    }
+    
+    .info-row:last-child {
+      border-bottom: none;
+    }
+    
+    .info-label {
+      font-weight: 700;
+      color: #667eea;
+      font-size: 16px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    
+    .info-value {
+      color: #2c3e50;
+      font-weight: 600;
+      font-size: 18px;
+    }
+    
+    .confidence-section {
+      margin: 30px 0;
+      padding: 25px;
+      background: linear-gradient(135deg, #00d084 0%, #00b375 100%);
+      border-radius: 20px;
+      box-shadow: 0 10px 30px rgba(0, 208, 132, 0.3);
+    }
+    
+    .confidence-label {
+      color: rgba(255, 255, 255, 0.9);
+      font-size: 14px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 10px;
+    }
+    
+    .confidence-value {
+      color: white;
+      font-size: 48px;
+      font-weight: 800;
+      text-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+    }
+    
+    .confidence-bar {
+      width: 100%;
+      height: 12px;
+      background: rgba(255, 255, 255, 0.3);
+      border-radius: 10px;
+      overflow: hidden;
+      margin-top: 15px;
+    }
+    
+    .confidence-fill {
+      height: 100%;
+      background: white;
+      border-radius: 10px;
+      transition: width 1s ease-out;
+      box-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+    }
+    
+    .action-buttons {
+      margin-top: 35px;
+      display: flex;
+      gap: 15px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+    
+    .action-buttons button {
+      min-width: 180px;
+    }
+    
+    .timestamp {
+      margin-top: 25px;
+      padding-top: 25px;
+      border-top: 2px solid rgba(102, 126, 234, 0.1);
+      color: #999;
+      font-size: 13px;
+      font-weight: 500;
+    }
+    
+    @media (max-width: 768px) {
+      .result-card {
+        padding: 35px 25px;
+      }
+      
+      .result-title {
+        font-size: 24px;
+      }
+      
+      .result-photo {
+        width: 180px;
+        height: 180px;
+      }
+      
+      .info-row {
+        flex-direction: column;
+        gap: 8px;
+        text-align: center;
+      }
+      
+      .confidence-value {
+        font-size: 40px;
+      }
+      
+      .action-buttons {
+        flex-direction: column;
+      }
+      
+      .action-buttons button {
+        width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <h1>✅ Hasil Pengenalan Wajah</h1>
+    <nav>
+      <a href="/">🏠 Beranda</a>
+      <a href="/users">👥 Daftar User</a>
+    </nav>
+  </header>
+
+  <main class="result-container">
+    <div class="result-card" id="resultCard">
+      <div class="success-icon">✅</div>
+      <h2 class="result-title">Wajah Berhasil Dikenali!</h2>
+      
+      <div class="result-photo-wrapper">
+        <img id="userPhoto" class="result-photo" src="" alt="Foto User">
+        <div class="photo-badge">👤</div>
+      </div>
+      
+      <div class="result-info">
+        <div class="info-row">
+          <span class="info-label">
+            <span>👤</span>
+            <span>Nama Lengkap</span>
+          </span>
+          <span class="info-value" id="userName">-</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">
+            <span>🎓</span>
+            <span>NIM</span>
+          </span>
+          <span class="info-value" id="userNim">-</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">
+            <span>⚧️</span>
+            <span>Jenis Kelamin</span>
+          </span>
+          <span class="info-value" id="userGender">-</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">
+            <span>🎂</span>
+            <span>Usia</span>
+          </span>
+          <span class="info-value" id="userAge">-</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">
+            <span>📅</span>
+            <span>Waktu Absensi</span>
+          </span>
+          <span class="info-value" id="timestamp">-</span>
+        </div>
+      </div>
+      
+      <div class="confidence-section">
+        <div class="confidence-label">🎯 Tingkat Akurasi</div>
+        <div class="confidence-value" id="confidenceValue">0%</div>
+        <div class="confidence-bar">
+          <div class="confidence-fill" id="confidenceFill" style="width: 0%"></div>
+        </div>
+      </div>
+      
+      <div class="action-buttons">
+        <button onclick="window.location.href='/'">
+          🔄 Kenali Lagi
+        </button>
+        <button onclick="window.location.href='/users'" style="background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);">
+          👥 Lihat Semua User
+        </button>
+      </div>
+    
+    </div>
+  </main>
+
+  <script>
+    (function(){
+      const userData = sessionStorage.getItem('recognizedUser');
+      const capturedImage = sessionStorage.getItem('capturedImage');
+      
+      // Redirect ke home jika tidak ada data
+      if (!userData) {
+        alert('⚠️ Tidak ada data pengenalan. Silakan capture wajah terlebih dahulu.');
+        window.location.href = '/';
+        return;
+      }
+      
+      try {
+        const user = JSON.parse(userData);
+        
+        // Set user info
+        document.getElementById('userName').textContent = user.name || '-';
+        document.getElementById('userNim').textContent = user.nim || '-';
+        document.getElementById('userGender').textContent = user.gender || '-';
+        document.getElementById('userAge').textContent = user.age ? `${user.age} tahun` : '-';
+        
+        // Set confidence with animation
+        const confidence = user.confidence || 0;
+        const confidenceValueEl = document.getElementById('confidenceValue');
+        const confidenceFillEl = document.getElementById('confidenceFill');
+        
+        // Animate confidence number
+        let current = 0;
+        const target = parseFloat(confidence);
+        const increment = target / 50; // 50 steps
+        const timer = setInterval(() => {
+          current += increment;
+          if (current >= target) {
+            current = target;
+            clearInterval(timer);
+          }
+          confidenceValueEl.textContent = current.toFixed(2) + '%';
+        }, 20);
+        
+        // Animate progress bar
+        setTimeout(() => {
+          confidenceFillEl.style.width = confidence + '%';
+        }, 100);
+        
+        // Set photo (prioritas: captured image, lalu registered photo)
+        const photoEl = document.getElementById('userPhoto');
+        if (capturedImage) {
+          photoEl.src = capturedImage;
+        } else if (user.photo) {
+          photoEl.src = 'data:image/jpeg;base64,' + user.photo;
+        } else {
+          // Fallback: Generate avatar with initial
+          const initial = user.name ? user.name[0].toUpperCase() : '?';
+          photoEl.src = `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='50' fill='%23667eea'/%3E%3Ctext x='50' y='50' text-anchor='middle' dy='.3em' fill='white' font-size='40' font-weight='bold'%3E${initial}%3C/text%3E%3C/svg%3E`;
+        }
+        
+        // Set timestamp
+        const now = new Date();
+        const timeString = now.toLocaleString('id-ID', {
+          weekday: 'long',
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit'
+        });
+        document.getElementById('timestamp').innerHTML = `${timeString}`;
+        
+        // Optional: Clear session storage setelah beberapa detik (uncomment jika mau)
+        // setTimeout(() => {
+        //   sessionStorage.removeItem('recognizedUser');
+        //   sessionStorage.removeItem('capturedImage');
+        // }, 5000);
+        
+      } catch(err) {
+        console.error('Error parsing user data:', err);
+        alert('❌ Terjadi kesalahan saat memproses data. Silakan coba lagi.');
+        window.location.href = '/';
+      }
+    })();
+  </script>
+</body>
+</html>

@@ -5,18 +5,107 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Pendaftaran Wajah - Face Recognition</title>
   <link rel="stylesheet" href="/styles.css">
+  <style>
+    .form-group {
+      margin-bottom: 20px;
+    }
+    
+    .form-group label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: 600;
+      color: #fff;
+      text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    }
+    
+    .form-row {
+      display: flex;
+      gap: 15px;
+    }
+    
+    .form-row .form-group {
+      flex: 1;
+    }
+    
+    select {
+      padding: 14px 20px;
+      width: 100%;
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      border-radius: 15px;
+      font-size: 16px;
+      background: rgba(255, 255, 255, 0.95);
+      transition: all 0.3s ease;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+      cursor: pointer;
+    }
+    
+    select:focus {
+      outline: none;
+      border-color: #667eea;
+      box-shadow: 0 6px 20px rgba(102, 126, 234, 0.3);
+      transform: translateY(-2px);
+    }
+    
+    input[type="number"] {
+      padding: 14px 20px;
+      width: 100%;
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      border-radius: 15px;
+      font-size: 16px;
+      background: rgba(255, 255, 255, 0.95);
+      transition: all 0.3s ease;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    }
+    
+    input[type="number"]:focus {
+      outline: none;
+      border-color: #667eea;
+      box-shadow: 0 6px 20px rgba(102, 126, 234, 0.3);
+      transform: translateY(-2px);
+    }
+    
+    @media (max-width: 768px) {
+      .form-row {
+        flex-direction: column;
+      }
+    }
+  </style>
 </head>
 <body>
   <header class="topbar">
     <h1>📝 Pendaftaran Wajah</h1>
     <nav>
       <a href="/">🏠 Beranda</a>
+      <a href="/users">👥 Daftar User</a>
     </nav>
   </header>
 
   <main class="container">
-    <label>👤 Nama Lengkap:</label>
-    <input type="text" id="nameInput" placeholder="Masukkan nama Anda" />
+    <div class="form-group">
+      <label for="nameInput">👤 Nama Lengkap:</label>
+      <input type="text" id="nameInput" placeholder="Masukkan nama lengkap Anda" />
+    </div>
+    
+    <div class="form-group">
+      <label for="nimInput">🎓 NIM (Nomor Induk Mahasiswa):</label>
+      <input type="text" id="nimInput" placeholder="Masukkan NIM Anda" />
+    </div>
+    
+    <div class="form-row">
+      <div class="form-group">
+        <label for="genderInput">⚧️ Jenis Kelamin:</label>
+        <select id="genderInput">
+          <option value="">Pilih jenis kelamin</option>
+          <option value="Laki-laki">Laki-laki</option>
+          <option value="Perempuan">Perempuan</option>
+        </select>
+      </div>
+      
+      <div class="form-group">
+        <label for="ageInput">🎂 Usia:</label>
+        <input type="number" id="ageInput" placeholder="Masukkan usia" min="1" max="150" />
+      </div>
+    </div>
 
     <div class="video-wrapper">
       <video id="regVideo" autoplay playsinline muted></video>

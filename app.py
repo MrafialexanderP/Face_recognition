@@ -2,6 +2,7 @@ import os
 import json
 import base64
 from io import BytesIO
+from datetime import datetime
 
 from flask import Flask, request, jsonify, send_from_directory
 
@@ -10,7 +11,6 @@ try:
     from PIL import Image
     import face_recognition
 except Exception as e:
-    # Defer import errors to runtime response for clearer guidance
     np = None
     Image = None
     face_recognition = None
@@ -21,6 +21,9 @@ DATA_DIR = os.path.join(APP_ROOT, "data")
 USERS_DB = os.path.join(DATA_DIR, "users.json")
 
 app = Flask(__name__, static_folder=PUBLIC_DIR, static_url_path="")
+
+# Recognition threshold (lower = more strict)
+RECOGNITION_TOLERANCE = 0.6
 
 
 def ensure_data_files():
@@ -34,7 +37,6 @@ def load_users():
     ensure_data_files()
     with open(USERS_DB, "r", encoding="utf-8") as f:
         data = json.load(f)
-    # Keep encodings as lists; convert to numpy when comparing
     return data
 
 
@@ -44,20 +46,19 @@ def save_users(data):
 
 
 def decode_image_to_rgb(image_b64: str):
-    """Decode a base64 (no data URL prefix) string to a RGB numpy array."""
+    """Decode a base64 string to RGB numpy array."""
     if np is None or Image is None:
-        raise RuntimeError("Python packages not fully installed. Please install dependencies from requirements.txt.")
+        raise RuntimeError("Dependencies not installed.")
     try:
         img_bytes = base64.b64decode(image_b64)
         pil_img = Image.open(BytesIO(img_bytes)).convert("RGB")
         return np.array(pil_img)
     except Exception as e:
-        raise ValueError(f"Gagal decode gambar: {e}")
+        raise ValueError(f"Failed to decode image: {e}")
 
 
 @app.route("/")
 def root():
-    # Serve index.html
     return send_from_directory(PUBLIC_DIR, "index.html")
 
 
@@ -66,32 +67,79 @@ def register_page():
     return send_from_directory(PUBLIC_DIR, "register.html")
 
 
+@app.route("/result")
+def result_page():
+    return send_from_directory(PUBLIC_DIR, "result.html")
+
+
+@app.route("/users")
+def users_page():
+    return send_from_directory(PUBLIC_DIR, "users.html")
+
+
 @app.route("/api/health")
 def health():
     return jsonify({"status": "ok"})
 
 
-@app.route("/api/users", methods=["GET"]) 
+@app.route("/api/users", methods=["GET"])
 def list_users():
+    """Get all registered users with their info (without encodings)"""
     data = load_users()
-    # Return unique names and their sample counts
-    counts = {}
+    users_list = []
     for u in data.get("users", []):
-        counts[u.get("name", "Unknown")] = counts.get(u.get("name", "Unknown"), 0) + 1
-    return jsonify({"users": counts})
+        users_list.append({
+            "id": u.get("id"),
+            "name": u.get("name"),
+            "nim": u.get("nim"),
+            "gender": u.get("gender"),
+            "age": u.get("age"),
+            "photo": u.get("photo"),
+            "registered_at": u.get("registered_at")
+        })
+    return jsonify({"ok": True, "users": users_list})
 
 
-@app.route("/api/register", methods=["POST"]) 
+@app.route("/api/users/<user_id>", methods=["DELETE"])
+def delete_user(user_id):
+    """Delete a user by ID"""
+    data = load_users()
+    users = data.get("users", [])
+    initial_count = len(users)
+    users = [u for u in users if u.get("id") != user_id]
+    
+    if len(users) == initial_count:
+        return jsonify({"ok": False, "error": "User not found"}), 404
+    
+    data["users"] = users
+    save_users(data)
+    return jsonify({"ok": True, "message": "User deleted successfully"})
+
+
+@app.route("/api/register", methods=["POST"])
 def api_register():
+    """Register a new face with biodata"""
     if face_recognition is None:
-        return jsonify({"ok": False, "error": "Dependencies not installed. Install from requirements.txt (note: dlib/face_recognition on Windows requires Build Tools)."}), 500
+        return jsonify({"ok": False, "error": "Dependencies not installed."}), 500
+    
     payload = request.get_json(silent=True) or {}
     name = (payload.get("name") or "").strip()
+    nim = (payload.get("nim") or "").strip()
+    gender = (payload.get("gender") or "").strip()
+    age = payload.get("age")
     image_b64 = payload.get("image")
+    
+    # Validation
     if not name:
         return jsonify({"ok": False, "error": "Nama wajib diisi."}), 400
+    if not nim:
+        return jsonify({"ok": False, "error": "NIM wajib diisi."}), 400
+    if not gender or gender not in ["Laki-laki", "Perempuan"]:
+        return jsonify({"ok": False, "error": "Jenis kelamin tidak valid."}), 400
+    if not age or not isinstance(age, int) or age < 1 or age > 150:
+        return jsonify({"ok": False, "error": "Usia tidak valid."}), 400
     if not image_b64:
-        return jsonify({"ok": False, "error": "Gambar tidak ditemukan."}), 400
+        return jsonify({"ok": False, "error": "Foto tidak ditemukan."}), 400
 
     try:
         rgb = decode_image_to_rgb(image_b64)
@@ -100,7 +148,8 @@ def api_register():
 
     try:
         model = (payload.get("model") or "auto").lower()
-        # Coba deteksi cepat (HOG) terlebih dahulu; jika gagal, fallback ke CNN (lebih akurat untuk berbagai arah wajah)
+        
+        # Detect face
         if model == "cnn":
             boxes = face_recognition.face_locations(rgb, model="cnn", number_of_times_to_upsample=1)
         elif model == "hog":
@@ -110,28 +159,55 @@ def api_register():
             if not boxes:
                 boxes = face_recognition.face_locations(rgb, model="cnn", number_of_times_to_upsample=1)
         
-        if len(boxes) != 1:
-            return jsonify({"ok": False, "error": f"Ditemukan {len(boxes)} wajah. Harap pastikan hanya satu wajah saat pendaftaran."}), 400
-        enc = face_recognition.face_encodings(rgb, boxes, num_jitters=2)  # num_jitters=2 untuk akurasi pendaftaran
+        if len(boxes) == 0:
+            return jsonify({"ok": False, "error": "Tidak ada wajah terdeteksi. Pastikan wajah Anda terlihat jelas."}), 400
+        if len(boxes) > 1:
+            return jsonify({"ok": False, "error": f"Ditemukan {len(boxes)} wajah. Pastikan hanya ada satu wajah."}), 400
+        
+        # Extract encoding
+        enc = face_recognition.face_encodings(rgb, boxes, num_jitters=2)
         if not enc:
-            return jsonify({"ok": False, "error": "Tidak dapat mengekstrak fitur wajah."}), 400
+            return jsonify({"ok": False, "error": "Gagal mengekstrak fitur wajah."}), 400
+        
         encoding = enc[0].tolist()
-
+        
+        # Generate unique ID
+        user_id = f"user_{datetime.now().strftime('%Y%m%d_%H%M%S_%f')}"
+        
+        # Save user data
         data = load_users()
-        data.setdefault("users", []).append({"name": name, "encoding": encoding})
+        user_data = {
+            "id": user_id,
+            "name": name,
+            "nim": nim,
+            "gender": gender,
+            "age": age,
+            "photo": image_b64,
+            "encoding": encoding,
+            "registered_at": datetime.now().isoformat()
+        }
+        data.setdefault("users", []).append(user_data)
         save_users(data)
-        return jsonify({"ok": True, "message": f"Berhasil mendaftarkan {name}", "count": len(data.get("users", []))})
+        
+        return jsonify({
+            "ok": True,
+            "message": f"Berhasil mendaftarkan {name}",
+            "user_id": user_id
+        })
     except Exception as e:
         return jsonify({"ok": False, "error": f"Gagal mendaftar: {e}"}), 500
 
 
-@app.route("/api/detect", methods=["POST"]) 
-def api_detect():
+@app.route("/api/recognize", methods=["POST"])
+def api_recognize():
+    """Recognize face and return matched user data"""
     if face_recognition is None:
-        return jsonify({"ok": False, "error": "Dependencies not installed. Install from requirements.txt (note: dlib/face_recognition on Windows requires Build Tools)."}), 500
+        return jsonify({"ok": False, "error": "Dependencies not installed."}), 500
+    
     payload = request.get_json(silent=True) or {}
     image_b64 = payload.get("image")
     model_pref = (payload.get("model") or "auto").lower()
+    
     if not image_b64:
         return jsonify({"ok": False, "error": "Gambar tidak ditemukan."}), 400
 
@@ -141,27 +217,76 @@ def api_detect():
         return jsonify({"ok": False, "error": str(e)}), 400
 
     try:
-        # Gunakan preferensi model dari client
+        # Detect faces
         if model_pref == "cnn":
             boxes = face_recognition.face_locations(rgb, model="cnn", number_of_times_to_upsample=1)
         elif model_pref == "hog":
             boxes = face_recognition.face_locations(rgb, model="hog")
         else:  # auto
-            # HOG lebih cepat untuk tracking real-time
             boxes = face_recognition.face_locations(rgb, model="hog")
             if not boxes:
                 boxes = face_recognition.face_locations(rgb, model="cnn", number_of_times_to_upsample=1)
         
-        # Hanya return koordinat box tanpa recognition
-        results = []
-        for box in boxes:
-            top, right, bottom, left = box
-            results.append({
-                "box": {"top": int(top), "right": int(right), "bottom": int(bottom), "left": int(left)}
+        if len(boxes) == 0:
+            return jsonify({"ok": False, "error": "Tidak ada wajah terdeteksi."}), 400
+        
+        if len(boxes) > 1:
+            return jsonify({"ok": False, "error": f"Ditemukan {len(boxes)} wajah. Pastikan hanya ada satu wajah."}), 400
+        
+        # Extract encoding from detected face
+        face_encodings = face_recognition.face_encodings(rgb, boxes, num_jitters=1)
+        if not face_encodings:
+            return jsonify({"ok": False, "error": "Gagal mengekstrak fitur wajah."}), 400
+        
+        unknown_encoding = face_encodings[0]
+        
+        # Load registered users
+        data = load_users()
+        users = data.get("users", [])
+        
+        if not users:
+            return jsonify({"ok": False, "error": "Belum ada wajah terdaftar. Silakan registrasi terlebih dahulu."}), 404
+        
+        # Compare with all registered faces
+        best_match = None
+        best_distance = float('inf')
+        
+        for user in users:
+            known_encoding = np.array(user.get("encoding", []))
+            if known_encoding.size == 0:
+                continue
+            
+            # Calculate face distance
+            distance = face_recognition.face_distance([known_encoding], unknown_encoding)[0]
+            
+            if distance < best_distance and distance < RECOGNITION_TOLERANCE:
+                best_distance = distance
+                best_match = user
+        
+        if best_match:
+            confidence = round((1 - best_distance) * 100, 2)
+            return jsonify({
+                "ok": True,
+                "matched": True,
+                "user": {
+                    "id": best_match.get("id"),
+                    "name": best_match.get("name"),
+                    "nim": best_match.get("nim"),
+                    "gender": best_match.get("gender"),
+                    "age": best_match.get("age"),
+                    "photo": best_match.get("photo"),
+                    "confidence": confidence
+                }
             })
-        return jsonify({"ok": True, "faces": results})
+        else:
+            return jsonify({
+                "ok": True,
+                "matched": False,
+                "message": "Wajah tidak dikenali. Silakan registrasi terlebih dahulu."
+            })
+            
     except Exception as e:
-        return jsonify({"ok": False, "error": f"Gagal mendeteksi: {e}"}), 500
+        return jsonify({"ok": False, "error": f"Gagal mengenali wajah: {e}"}), 500
 
 
 if __name__ == "__main__":

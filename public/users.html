@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Daftar User - Face Recognition</title>
+  <link rel="stylesheet" href="/styles.css">
+  <style>
+    .users-container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 40px 20px;
+    }
+    
+    .users-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 25px;
+      margin-top: 30px;
+    }
+    
+    .user-card {
+      background: rgba(255, 255, 255, 0.95);
+      border-radius: 20px;
+      padding: 25px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+      transition: all 0.3s ease;
+      animation: fadeIn 0.5s ease-out;
+    }
+    
+    .user-card:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 15px 40px rgba(0, 0, 0, 0.3);
+    }
+    
+    .user-photo {
+      width: 120px;
+      height: 120px;
+      border-radius: 50%;
+      object-fit: cover;
+      margin: 0 auto 20px;
+      display: block;
+      border: 4px solid #667eea;
+      box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+    }
+    
+    .user-info {
+      text-align: center;
+      color: #2c3e50;
+    }
+    
+    .user-name {
+      font-size: 20px;
+      font-weight: 700;
+      margin-bottom: 10px;
+      color: #667eea;
+    }
+    
+    .user-detail {
+      font-size: 14px;
+      color: #555;
+      margin: 5px 0;
+    }
+    
+    .user-actions {
+      margin-top: 15px;
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+    }
+    
+    .btn-delete {
+      padding: 8px 20px;
+      background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%);
+      color: white;
+      border: none;
+      border-radius: 20px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 13px;
+      transition: all 0.3s ease;
+      box-shadow: 0 4px 15px rgba(255, 107, 107, 0.3);
+    }
+    
+    .btn-delete:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(255, 107, 107, 0.5);
+    }
+    
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+      color: white;
+    }
+    
+    .empty-state h2 {
+      font-size: 24px;
+      margin-bottom: 15px;
+    }
+    
+    .empty-state p {
+      font-size: 16px;
+      margin-bottom: 30px;
+      opacity: 0.9;
+    }
+    
+    .loading {
+      text-align: center;
+      padding: 60px 20px;
+      color: white;
+      font-size: 18px;
+    }
+    
+    @keyframes fadeIn {
+      from { opacity: 0; transform: scale(0.9); }
+      to { opacity: 1; transform: scale(1); }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <h1>👥 Daftar User Terdaftar</h1>
+    <nav>
+      <a href="/">🏠 Beranda</a>
+      <a href="/register">📝 Daftar Wajah</a>
+    </nav>
+  </header>
+
+  <main class="users-container">
+    <div id="loadingState" class="loading">
+      ⏳ Memuat data user...
+    </div>
+    
+    <div id="emptyState" class="empty-state hidden">
+      <h2>📭 Belum Ada User Terdaftar</h2>
+      <p>Silakan daftarkan wajah pertama Anda untuk memulai</p>
+      <button onclick="window.location.href='/register'">📝 Daftar Sekarang</button>
+    </div>
+    
+    <div id="usersGrid" class="users-grid hidden"></div>
+  </main>
+
+  <script>
+    (function(){
+      const loadingState = document.getElementById('loadingState');
+      const emptyState = document.getElementById('emptyState');
+      const usersGrid = document.getElementById('usersGrid');
+      
+      async function loadUsers(){
+        try {
+          const resp = await fetch('/api/users');
+          const data = await resp.json();
+          
+          loadingState.classList.add('hidden');
+          
+          if (!data.ok || !data.users || data.users.length === 0) {
+            emptyState.classList.remove('hidden');
+            return;
+          }
+          
+          usersGrid.classList.remove('hidden');
+          renderUsers(data.users);
+          
+        } catch(err) {
+          console.error(err);
+          loadingState.textContent = '❌ Gagal memuat data: ' + err.message;
+        }
+      }
+      
+      function renderUsers(users){
+        usersGrid.innerHTML = '';
+        
+        users.forEach(user => {
+          const card = document.createElement('div');
+          card.className = 'user-card';
+          
+          const photoSrc = user.photo 
+            ? `data:image/jpeg;base64,${user.photo}` 
+            : 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"%3E%3Ccircle cx="50" cy="50" r="50" fill="%23667eea"/%3E%3Ctext x="50" y="50" text-anchor="middle" dy=".3em" fill="white" font-size="40" font-weight="bold"%3E' + (user.name ? user.name[0].toUpperCase() : '?') + '%3C/text%3E%3C/svg%3E';
+          
+          card.innerHTML = `
+            <img src="${photoSrc}" alt="${user.name}" class="user-photo">
+            <div class="user-info">
+              <div class="user-name">${user.name || 'Unknown'}</div>
+              <div class="user-detail">🎓 NIM: ${user.nim || '-'}</div>
+              <div class="user-detail">⚧️ ${user.gender || '-'}</div>
+              <div class="user-detail">🎂 ${user.age ? user.age + ' tahun' : '-'}</div>
+              <div class="user-detail" style="font-size: 11px; color: #999; margin-top: 10px;">
+                📅 ${user.registered_at ? new Date(user.registered_at).toLocaleDateString('id-ID') : '-'}
+              </div>
+            </div>
+            <div class="user-actions">
+              <button class="btn-delete" onclick="deleteUser('${user.id}', '${user.name}')">
+                🗑️ Hapus
+              </button>
+            </div>
+          `;
+          
+          usersGrid.appendChild(card);
+        });
+      }
+      
+      window.deleteUser = async function(userId, userName){
+        if (!confirm(`Yakin ingin menghapus ${userName}?`)) {
+          return;
+        }
+        
+        try {
+          const resp = await fetch(`/api/users/${userId}`, {
+            method: 'DELETE'
+          });
+          const data = await resp.json();
+          
+          if (!data.ok) {
+            throw new Error(data.error || 'Gagal menghapus user');
+          }
+          
+          alert('✅ User berhasil dihapus');
+          loadUsers(); // Reload
+          
+        } catch(err) {
+          console.error(err);
+          alert('❌ ' + err.message);
+        }
+      };
+      
+      // Load users on page load
+      loadUsers();
+    })();
+  </script>
+</body>
+</html>

@@ -3,12 +3,16 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Face Detection - Tracking Wajah Real-Time</title>
+  <title>Face Recognition - Absensi Wajah</title>
   <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
   <header class="topbar">
-    <h1>🎯 Face Detection & Tracking</h1>
+    <h1>🎯 Sistem Absensi Wajah Mahasiswa</h1>
+    <nav>
+      <a href="/register">📝 Daftar Wajah</a>
+      <a href="/users">👥 Daftar User</a>
+    </nav>
   </header>
 
   <main class="container">
@@ -19,6 +23,7 @@
 
     <div class="controls">
       <button id="startBtn">▶️ Mulai Kamera</button>
+      <button id="captureBtn" disabled>📸 Capture & Kenali</button>
       <button id="stopBtn" disabled>⏹️ Berhenti</button>
       <label style="display:flex; align-items:center; gap:8px;">
         <input type="checkbox" id="hiAcc" /> 
@@ -26,7 +31,7 @@
       </label>
     </div>
 
-    <div id="status" class="status">✨ Siap untuk mendeteksi wajah</div>
+    <div id="status" class="status">✨ Siap untuk mengenali wajah</div>
   </main>
 
   <script src="/script.js"></script>
