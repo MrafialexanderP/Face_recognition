@@ -5,136 +5,331 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Daftar User - Face Recognition</title>
   <link rel="stylesheet" href="/styles.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>👤</text></svg>">
   <style>
     .users-container {
       max-width: 1200px;
       margin: 0 auto;
-      padding: 40px 20px;
+      padding: 48px 24px;
+    }
+    
+    .users-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+    
+    .users-header-left h2 {
+      font-size: 24px;
+      font-weight: 700;
+      color: var(--text-primary);
+      margin-bottom: 4px;
+      letter-spacing: -0.5px;
+    }
+    
+    .users-header-left p {
+      font-size: 14px;
+      color: var(--text-secondary);
+    }
+    
+    .users-stats {
+      display: flex;
+      gap: 24px;
+    }
+    
+    .stat-item {
+      text-align: center;
+      padding: 16px 24px;
+      background: var(--bg-card);
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--border-color);
+      box-shadow: var(--shadow-sm);
+    }
+    
+    .stat-number {
+      font-size: 28px;
+      font-weight: 800;
+      color: var(--primary-color);
+      letter-spacing: -1px;
+    }
+    
+    .stat-label {
+      font-size: 12px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-top: 4px;
     }
     
     .users-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-      gap: 25px;
-      margin-top: 30px;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 24px;
     }
     
     .user-card {
-      background: rgba(255, 255, 255, 0.95);
-      border-radius: 20px;
-      padding: 25px;
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
-      transition: all 0.3s ease;
-      animation: fadeIn 0.5s ease-out;
+      background: var(--bg-card);
+      border-radius: var(--radius-xl);
+      padding: 24px;
+      box-shadow: var(--shadow-sm);
+      transition: all 0.2s ease;
+      animation: fadeIn 0.4s ease-out;
+      border: 1px solid var(--border-color);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
     }
     
     .user-card:hover {
-      transform: translateY(-5px);
-      box-shadow: 0 15px 40px rgba(0, 0, 0, 0.3);
+      transform: translateY(-4px);
+      box-shadow: var(--shadow-lg);
+      border-color: var(--primary-color);
     }
     
     .user-photo {
-      width: 120px;
-      height: 120px;
+      width: 100px;
+      height: 100px;
       border-radius: 50%;
       object-fit: cover;
-      margin: 0 auto 20px;
-      display: block;
-      border: 4px solid #667eea;
-      box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+      margin-bottom: 20px;
+      border: 3px solid var(--primary-color);
+      box-shadow: 0 4px 16px rgba(0, 102, 255, 0.2);
+      transition: all 0.2s ease;
+    }
+    
+    .user-card:hover .user-photo {
+      transform: scale(1.05);
     }
     
     .user-info {
       text-align: center;
-      color: #2c3e50;
+      width: 100%;
     }
     
     .user-name {
-      font-size: 20px;
+      font-size: 18px;
       font-weight: 700;
-      margin-bottom: 10px;
-      color: #667eea;
+      margin-bottom: 4px;
+      color: var(--text-primary);
+      letter-spacing: -0.3px;
+    }
+    
+    .user-nim {
+      font-size: 13px;
+      color: var(--primary-color);
+      font-weight: 600;
+      margin-bottom: 16px;
+      background: rgba(0, 102, 255, 0.1);
+      padding: 4px 12px;
+      border-radius: var(--radius-full);
+      display: inline-block;
+    }
+    
+    .user-details {
+      display: flex;
+      justify-content: center;
+      gap: 16px;
+      margin-bottom: 16px;
+      padding: 12px 0;
+      border-top: 1px solid var(--border-color);
+      border-bottom: 1px solid var(--border-color);
     }
     
     .user-detail {
-      font-size: 14px;
-      color: #555;
-      margin: 5px 0;
+      font-size: 13px;
+      color: var(--text-secondary);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    
+    .user-detail svg {
+      width: 14px;
+      height: 14px;
+      color: var(--text-muted);
+    }
+    
+    .user-date {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-bottom: 16px;
     }
     
     .user-actions {
-      margin-top: 15px;
-      display: flex;
-      justify-content: center;
-      gap: 10px;
+      width: 100%;
     }
     
     .btn-delete {
-      padding: 8px 20px;
-      background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%);
-      color: white;
-      border: none;
-      border-radius: 20px;
+      width: 100%;
+      padding: 10px 20px;
+      background: var(--bg-light);
+      color: var(--danger-color);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-full);
       cursor: pointer;
       font-weight: 600;
       font-size: 13px;
-      transition: all 0.3s ease;
-      box-shadow: 0 4px 15px rgba(255, 107, 107, 0.3);
+      transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
     }
     
     .btn-delete:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 6px 20px rgba(255, 107, 107, 0.5);
+      background: var(--danger-color);
+      color: white;
+      border-color: var(--danger-color);
+    }
+    
+    .btn-delete svg {
+      width: 14px;
+      height: 14px;
     }
     
     .empty-state {
       text-align: center;
-      padding: 60px 20px;
-      color: white;
+      padding: 80px 20px;
+      background: var(--bg-card);
+      border-radius: var(--radius-xl);
+      border: 1px solid var(--border-color);
+    }
+    
+    .empty-icon {
+      width: 80px;
+      height: 80px;
+      background: var(--bg-light);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 24px;
+    }
+    
+    .empty-icon svg {
+      width: 40px;
+      height: 40px;
+      color: var(--text-muted);
     }
     
     .empty-state h2 {
-      font-size: 24px;
-      margin-bottom: 15px;
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--text-primary);
+      margin-bottom: 8px;
     }
     
     .empty-state p {
-      font-size: 16px;
-      margin-bottom: 30px;
-      opacity: 0.9;
+      font-size: 15px;
+      margin-bottom: 24px;
+      color: var(--text-secondary);
     }
     
     .loading {
       text-align: center;
-      padding: 60px 20px;
-      color: white;
-      font-size: 18px;
+      padding: 80px 20px;
+      background: var(--bg-card);
+      border-radius: var(--radius-xl);
+      border: 1px solid var(--border-color);
+    }
+    
+    .loading-spinner {
+      width: 48px;
+      height: 48px;
+      border: 3px solid var(--border-color);
+      border-top-color: var(--primary-color);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 16px;
+    }
+    
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    
+    .loading-text {
+      color: var(--text-secondary);
+      font-size: 15px;
     }
     
     @keyframes fadeIn {
-      from { opacity: 0; transform: scale(0.9); }
-      to { opacity: 1; transform: scale(1); }
+      from { opacity: 0; transform: translateY(16px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    
+    @media (max-width: 768px) {
+      .users-container {
+        padding: 24px 16px;
+      }
+      
+      .users-header {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+      
+      .users-stats {
+        width: 100%;
+        justify-content: center;
+      }
+      
+      .users-grid {
+        grid-template-columns: 1fr;
+      }
     }
   </style>
 </head>
 <body>
   <header class="topbar">
-    <h1>👥 Daftar User Terdaftar</h1>
+    <h1>Daftar User</h1>
     <nav>
-      <a href="/">🏠 Beranda</a>
-      <a href="/register">📝 Daftar Wajah</a>
+      <a href="/">Beranda</a>
+      <a href="/register">Daftar Wajah</a>
+      <a href="/users" class="active">Daftar User</a>
     </nav>
   </header>
 
   <main class="users-container">
+    <div class="users-header">
+      <div class="users-header-left">
+        <h2>User Terdaftar</h2>
+        <p>Kelola data wajah yang sudah terdaftar di sistem</p>
+      </div>
+      <div class="users-stats">
+        <div class="stat-item">
+          <div class="stat-number" id="totalUsers">0</div>
+          <div class="stat-label">Total User</div>
+        </div>
+      </div>
+    </div>
+    
     <div id="loadingState" class="loading">
-      ⏳ Memuat data user...
+      <div class="loading-spinner"></div>
+      <div class="loading-text">Memuat data user...</div>
     </div>
     
     <div id="emptyState" class="empty-state hidden">
-      <h2>📭 Belum Ada User Terdaftar</h2>
+      <div class="empty-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+          <circle cx="9" cy="7" r="4"></circle>
+          <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+          <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+        </svg>
+      </div>
+      <h2>Belum Ada User Terdaftar</h2>
       <p>Silakan daftarkan wajah pertama Anda untuk memulai</p>
-      <button onclick="window.location.href='/register'">📝 Daftar Sekarang</button>
+      <button onclick="window.location.href='/register'">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+          <circle cx="8.5" cy="7" r="4"></circle>
+          <line x1="20" y1="8" x2="20" y2="14"></line>
+          <line x1="23" y1="11" x2="17" y2="11"></line>
+        </svg>
+        Daftar Sekarang
+      </button>
     </div>
     
     <div id="usersGrid" class="users-grid hidden"></div>
@@ -145,6 +340,7 @@
       const loadingState = document.getElementById('loadingState');
       const emptyState = document.getElementById('emptyState');
       const usersGrid = document.getElementById('usersGrid');
+      const totalUsersEl = document.getElementById('totalUsers');
       
       async function loadUsers(){
         try {
@@ -155,43 +351,64 @@
           
           if (!data.ok || !data.users || data.users.length === 0) {
             emptyState.classList.remove('hidden');
+            totalUsersEl.textContent = '0';
             return;
           }
           
+          totalUsersEl.textContent = data.users.length;
           usersGrid.classList.remove('hidden');
           renderUsers(data.users);
           
         } catch(err) {
           console.error(err);
-          loadingState.textContent = '❌ Gagal memuat data: ' + err.message;
+          loadingState.innerHTML = '<div class="loading-text" style="color: var(--danger-color);">Gagal memuat data: ' + err.message + '</div>';
         }
       }
       
       function renderUsers(users){
         usersGrid.innerHTML = '';
         
-        users.forEach(user => {
+        users.forEach((user, index) => {
           const card = document.createElement('div');
           card.className = 'user-card';
+          card.style.animationDelay = `${index * 0.1}s`;
           
           const photoSrc = user.photo 
             ? `data:image/jpeg;base64,${user.photo}` 
-            : 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"%3E%3Ccircle cx="50" cy="50" r="50" fill="%23667eea"/%3E%3Ctext x="50" y="50" text-anchor="middle" dy=".3em" fill="white" font-size="40" font-weight="bold"%3E' + (user.name ? user.name[0].toUpperCase() : '?') + '%3C/text%3E%3C/svg%3E';
+            : `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='50' fill='%230066FF'/%3E%3Ctext x='50' y='50' text-anchor='middle' dy='.35em' fill='white' font-size='40' font-weight='bold'%3E${user.name ? user.name[0].toUpperCase() : '?'}%3C/text%3E%3C/svg%3E`;
           
           card.innerHTML = `
             <img src="${photoSrc}" alt="${user.name}" class="user-photo">
             <div class="user-info">
               <div class="user-name">${user.name || 'Unknown'}</div>
-              <div class="user-detail">🎓 NIM: ${user.nim || '-'}</div>
-              <div class="user-detail">⚧️ ${user.gender || '-'}</div>
-              <div class="user-detail">🎂 ${user.age ? user.age + ' tahun' : '-'}</div>
-              <div class="user-detail" style="font-size: 11px; color: #999; margin-top: 10px;">
-                📅 ${user.registered_at ? new Date(user.registered_at).toLocaleDateString('id-ID') : '-'}
+              <div class="user-nim">${user.nim || '-'}</div>
+              <div class="user-details">
+                <span class="user-detail">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                    <circle cx="8.5" cy="7" r="4"></circle>
+                  </svg>
+                  ${user.gender || '-'}
+                </span>
+                <span class="user-detail">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <polyline points="12 6 12 12 16 14"></polyline>
+                  </svg>
+                  ${user.age ? user.age + ' tahun' : '-'}
+                </span>
+              </div>
+              <div class="user-date">
+                Terdaftar: ${user.registered_at ? new Date(user.registered_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) : '-'}
               </div>
             </div>
             <div class="user-actions">
               <button class="btn-delete" onclick="deleteUser('${user.id}', '${user.name}')">
-                🗑️ Hapus
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="3 6 5 6 21 6"></polyline>
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                </svg>
+                Hapus User
               </button>
             </div>
           `;
@@ -215,16 +432,15 @@
             throw new Error(data.error || 'Gagal menghapus user');
           }
           
-          alert('✅ User berhasil dihapus');
-          loadUsers(); // Reload
+          alert('User berhasil dihapus');
+          loadUsers();
           
         } catch(err) {
           console.error(err);
-          alert('❌ ' + err.message);
+          alert(err.message);
         }
       };
       
-      // Load users on page load
       loadUsers();
     })();
   </script>
