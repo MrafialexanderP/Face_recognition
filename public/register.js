@@ -13,6 +13,15 @@
 
   let stream = null;
 
+  async function parseApiResponse(resp){
+    const text = await resp.text();
+    try {
+      return JSON.parse(text);
+    } catch (_err) {
+      throw new Error(`Server returned non-JSON response (status ${resp.status}).`);
+    }
+  }
+
   function setStatus(msg){ statusEl.textContent = msg; }
 
   async function startCamera(){
@@ -80,7 +89,7 @@
           model: hiAccReg && hiAccReg.checked ? 'cnn' : 'auto' 
         })
       });
-      const data = await resp.json();
+      const data = await parseApiResponse(resp);
       
       if (!data.ok) throw new Error(data.error || 'Gagal mendaftar');
       

@@ -1,18 +1,30 @@
 import os
+import sys
 import json
 import base64
-from io import BytesIO
+import hashlib
+import contextlib
+from difflib import SequenceMatcher
+from io import BytesIO, StringIO
 from datetime import datetime
 
 from flask import Flask, request, jsonify, send_from_directory
 
+face_recognition = None
 try:
     import numpy as np
-    from PIL import Image
-    import face_recognition
 except Exception as e:
     np = None
+
+try:
+    from PIL import Image
+except Exception as e:
     Image = None
+
+try:
+    with contextlib.redirect_stdout(StringIO()), contextlib.redirect_stderr(StringIO()):
+        import face_recognition
+except BaseException:
     face_recognition = None
 
 APP_ROOT = os.path.dirname(os.path.abspath(__file__))
@@ -55,6 +67,27 @@ def decode_image_to_rgb(image_b64: str):
         return np.array(pil_img)
     except Exception as e:
         raise ValueError(f"Failed to decode image: {e}")
+
+
+def build_fallback_fingerprint(image_b64: str):
+    """Build a lightweight fingerprint from base64 bytes (dependency-free fallback)."""
+    try:
+        raw = base64.b64decode(image_b64)
+    except Exception as e:
+        raise ValueError(f"Failed to decode image: {e}")
+
+    digest = hashlib.sha256(raw).hexdigest()
+    sampled = image_b64[::24][:1200]
+    return {
+        "sha256": digest,
+        "sample": sampled
+    }
+
+
+def fallback_similarity(sample_a: str, sample_b: str):
+    if not sample_a or not sample_b:
+        return 0.0
+    return SequenceMatcher(None, sample_a, sample_b).ratio()
 
 
 @app.route("/")
@@ -119,9 +152,6 @@ def delete_user(user_id):
 @app.route("/api/register", methods=["POST"])
 def api_register():
     """Register a new face with biodata"""
-    if face_recognition is None:
-        return jsonify({"ok": False, "error": "Dependencies not installed."}), 500
-    
     payload = request.get_json(silent=True) or {}
     name = (payload.get("name") or "").strip()
     nim = (payload.get("nim") or "").strip()
@@ -141,35 +171,46 @@ def api_register():
     if not image_b64:
         return jsonify({"ok": False, "error": "Foto tidak ditemukan."}), 400
 
-    try:
-        rgb = decode_image_to_rgb(image_b64)
-    except Exception as e:
-        return jsonify({"ok": False, "error": str(e)}), 400
+    rgb = None
+    if face_recognition is not None:
+        try:
+            rgb = decode_image_to_rgb(image_b64)
+        except Exception as e:
+            return jsonify({"ok": False, "error": str(e)}), 400
+
+    fp = None
+    if face_recognition is None:
+        try:
+            fp = build_fallback_fingerprint(image_b64)
+        except Exception as e:
+            return jsonify({"ok": False, "error": str(e)}), 400
 
     try:
         model = (payload.get("model") or "auto").lower()
         
-        # Detect face
-        if model == "cnn":
-            boxes = face_recognition.face_locations(rgb, model="cnn", number_of_times_to_upsample=1)
-        elif model == "hog":
-            boxes = face_recognition.face_locations(rgb, model="hog")
-        else:  # auto
-            boxes = face_recognition.face_locations(rgb, model="hog")
-            if not boxes:
+        encoding = []
+        if face_recognition is not None:
+            # Detect face
+            if model == "cnn":
                 boxes = face_recognition.face_locations(rgb, model="cnn", number_of_times_to_upsample=1)
-        
-        if len(boxes) == 0:
-            return jsonify({"ok": False, "error": "Tidak ada wajah terdeteksi. Pastikan wajah Anda terlihat jelas."}), 400
-        if len(boxes) > 1:
-            return jsonify({"ok": False, "error": f"Ditemukan {len(boxes)} wajah. Pastikan hanya ada satu wajah."}), 400
-        
-        # Extract encoding
-        enc = face_recognition.face_encodings(rgb, boxes, num_jitters=2)
-        if not enc:
-            return jsonify({"ok": False, "error": "Gagal mengekstrak fitur wajah."}), 400
-        
-        encoding = enc[0].tolist()
+            elif model == "hog":
+                boxes = face_recognition.face_locations(rgb, model="hog")
+            else:  # auto
+                boxes = face_recognition.face_locations(rgb, model="hog")
+                if not boxes:
+                    boxes = face_recognition.face_locations(rgb, model="cnn", number_of_times_to_upsample=1)
+
+            if len(boxes) == 0:
+                return jsonify({"ok": False, "error": "Tidak ada wajah terdeteksi. Pastikan wajah Anda terlihat jelas."}), 400
+            if len(boxes) > 1:
+                return jsonify({"ok": False, "error": f"Ditemukan {len(boxes)} wajah. Pastikan hanya ada satu wajah."}), 400
+
+            # Extract encoding
+            enc = face_recognition.face_encodings(rgb, boxes, num_jitters=2)
+            if not enc:
+                return jsonify({"ok": False, "error": "Gagal mengekstrak fitur wajah."}), 400
+
+            encoding = enc[0].tolist()
         
         # Generate unique ID
         user_id = f"user_{datetime.now().strftime('%Y%m%d_%H%M%S_%f')}"
@@ -184,6 +225,7 @@ def api_register():
             "age": age,
             "photo": image_b64,
             "encoding": encoding,
+            "fallback_fp": fp,
             "registered_at": datetime.now().isoformat()
         }
         data.setdefault("users", []).append(user_data)
@@ -192,6 +234,7 @@ def api_register():
         return jsonify({
             "ok": True,
             "message": f"Berhasil mendaftarkan {name}",
+            "mode": "face_recognition" if face_recognition is not None else "fallback",
             "user_id": user_id
         })
     except Exception as e:
@@ -201,9 +244,6 @@ def api_register():
 @app.route("/api/recognize", methods=["POST"])
 def api_recognize():
     """Recognize face and return matched user data"""
-    if face_recognition is None:
-        return jsonify({"ok": False, "error": "Dependencies not installed."}), 500
-    
     payload = request.get_json(silent=True) or {}
     image_b64 = payload.get("image")
     model_pref = (payload.get("model") or "auto").lower()
@@ -211,34 +251,44 @@ def api_recognize():
     if not image_b64:
         return jsonify({"ok": False, "error": "Gambar tidak ditemukan."}), 400
 
-    try:
-        rgb = decode_image_to_rgb(image_b64)
-    except Exception as e:
-        return jsonify({"ok": False, "error": str(e)}), 400
+    rgb = None
+    fp = None
+    if face_recognition is not None:
+        try:
+            rgb = decode_image_to_rgb(image_b64)
+        except Exception as e:
+            return jsonify({"ok": False, "error": str(e)}), 400
+    else:
+        try:
+            fp = build_fallback_fingerprint(image_b64)
+        except Exception as e:
+            return jsonify({"ok": False, "error": str(e)}), 400
 
     try:
-        # Detect faces
-        if model_pref == "cnn":
-            boxes = face_recognition.face_locations(rgb, model="cnn", number_of_times_to_upsample=1)
-        elif model_pref == "hog":
-            boxes = face_recognition.face_locations(rgb, model="hog")
-        else:  # auto
-            boxes = face_recognition.face_locations(rgb, model="hog")
-            if not boxes:
+        unknown_encoding = None
+        if face_recognition is not None:
+            # Detect faces
+            if model_pref == "cnn":
                 boxes = face_recognition.face_locations(rgb, model="cnn", number_of_times_to_upsample=1)
-        
-        if len(boxes) == 0:
-            return jsonify({"ok": False, "error": "Tidak ada wajah terdeteksi."}), 400
-        
-        if len(boxes) > 1:
-            return jsonify({"ok": False, "error": f"Ditemukan {len(boxes)} wajah. Pastikan hanya ada satu wajah."}), 400
-        
-        # Extract encoding from detected face
-        face_encodings = face_recognition.face_encodings(rgb, boxes, num_jitters=1)
-        if not face_encodings:
-            return jsonify({"ok": False, "error": "Gagal mengekstrak fitur wajah."}), 400
-        
-        unknown_encoding = face_encodings[0]
+            elif model_pref == "hog":
+                boxes = face_recognition.face_locations(rgb, model="hog")
+            else:  # auto
+                boxes = face_recognition.face_locations(rgb, model="hog")
+                if not boxes:
+                    boxes = face_recognition.face_locations(rgb, model="cnn", number_of_times_to_upsample=1)
+
+            if len(boxes) == 0:
+                return jsonify({"ok": False, "error": "Tidak ada wajah terdeteksi."}), 400
+
+            if len(boxes) > 1:
+                return jsonify({"ok": False, "error": f"Ditemukan {len(boxes)} wajah. Pastikan hanya ada satu wajah."}), 400
+
+            # Extract encoding from detected face
+            face_encodings = face_recognition.face_encodings(rgb, boxes, num_jitters=1)
+            if not face_encodings:
+                return jsonify({"ok": False, "error": "Gagal mengekstrak fitur wajah."}), 400
+
+            unknown_encoding = face_encodings[0]
         
         # Load registered users
         data = load_users()
@@ -252,22 +302,37 @@ def api_recognize():
         best_distance = float('inf')
         
         for user in users:
-            known_encoding = np.array(user.get("encoding", []))
-            if known_encoding.size == 0:
-                continue
-            
-            # Calculate face distance
-            distance = face_recognition.face_distance([known_encoding], unknown_encoding)[0]
-            
-            if distance < best_distance and distance < RECOGNITION_TOLERANCE:
-                best_distance = distance
-                best_match = user
+            if face_recognition is not None:
+                known_encoding = np.array(user.get("encoding", []))
+                if known_encoding.size == 0:
+                    continue
+
+                # Calculate face distance
+                distance = face_recognition.face_distance([known_encoding], unknown_encoding)[0]
+
+                if distance < best_distance and distance < RECOGNITION_TOLERANCE:
+                    best_distance = distance
+                    best_match = user
+            else:
+                known_fp = user.get("fallback_fp") or {}
+                if not known_fp.get("sample") and user.get("photo"):
+                    try:
+                        known_fp = build_fallback_fingerprint(user.get("photo"))
+                    except Exception:
+                        known_fp = {}
+                similarity = fallback_similarity(fp.get("sample", ""), known_fp.get("sample", ""))
+                # Convert similarity to pseudo-distance
+                distance = 1 - similarity
+                if distance < best_distance and similarity >= 0.68:
+                    best_distance = distance
+                    best_match = user
         
         if best_match:
             confidence = round((1 - best_distance) * 100, 2)
             return jsonify({
                 "ok": True,
                 "matched": True,
+                "mode": "face_recognition" if face_recognition is not None else "fallback",
                 "user": {
                     "id": best_match.get("id"),
                     "name": best_match.get("name"),
@@ -282,6 +347,7 @@ def api_recognize():
             return jsonify({
                 "ok": True,
                 "matched": False,
+                "mode": "face_recognition" if face_recognition is not None else "fallback",
                 "message": "Wajah tidak dikenali. Silakan registrasi terlebih dahulu."
             })
             
@@ -289,7 +355,27 @@ def api_recognize():
         return jsonify({"ok": False, "error": f"Gagal mengenali wajah: {e}"}), 500
 
 
+@app.errorhandler(Exception)
+def handle_unexpected_error(err):
+    if request.path.startswith("/api/"):
+        return jsonify({"ok": False, "error": f"Internal server error: {err}"}), 500
+    raise err
+
+
 if __name__ == "__main__":
     ensure_data_files()
     port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port, debug=True)
+
+    # Werkzeug reloader can crash in some terminals where stdin is closed.
+    debug_mode = os.environ.get("FLASK_DEBUG", "1") == "1"
+    try:
+        stdin_is_tty = sys.stdin is not None and sys.stdin.isatty()
+    except Exception:
+        stdin_is_tty = False
+
+    app.run(
+        host="0.0.0.0",
+        port=port,
+        debug=debug_mode,
+        use_reloader=debug_mode and stdin_is_tty,
+    )

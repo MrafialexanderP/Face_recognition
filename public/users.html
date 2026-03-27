@@ -341,11 +341,20 @@
       const emptyState = document.getElementById('emptyState');
       const usersGrid = document.getElementById('usersGrid');
       const totalUsersEl = document.getElementById('totalUsers');
+
+      async function parseApiResponse(resp){
+        const text = await resp.text();
+        try {
+          return JSON.parse(text);
+        } catch (_err) {
+          throw new Error(`Server returned non-JSON response (status ${resp.status}).`);
+        }
+      }
       
       async function loadUsers(){
         try {
           const resp = await fetch('/api/users');
-          const data = await resp.json();
+          const data = await parseApiResponse(resp);
           
           loadingState.classList.add('hidden');
           
@@ -426,7 +435,7 @@
           const resp = await fetch(`/api/users/${userId}`, {
             method: 'DELETE'
           });
-          const data = await resp.json();
+          const data = await parseApiResponse(resp);
           
           if (!data.ok) {
             throw new Error(data.error || 'Gagal menghapus user');
